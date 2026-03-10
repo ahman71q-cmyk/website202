@@ -1,7 +1,11 @@
 // ==================== إعدادات Supabase ====================
+// ==================== إعدادات Supabase ====================
 const supabaseUrl = 'https://lpigzuymmzisrawmfcuq.supabase.co';
-const supabaseKey = 'sb_publishable_vQ6Eh--B3jrQXgP_q3iN6Q_uv1m3k0G'; // ⚠️ حط مفتاحك الكامل هنا
+const supabaseKey = 'sb_publishable_vQ6Eh--B3jrQXgP_q3iN6Q_uv1m3k0G';
+
+// استخدم window.supabase عشان متعملش conflict
 const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
+// استخدم supabaseClient بدل supabase في كل الكود
 // ==================== إعدادات Supabase ====================
 
 // ⚠️ سطر مهم جداً - عشان الـ Console
@@ -278,10 +282,18 @@ function logout() {
 
 async function sendMessage() {
     const messageText = document.getElementById('newMessage').value.trim();
-    if (!messageText || !currentUser) return;
+    if (!messageText || !currentUser) {
+        console.error('❌ No message text or no current user');
+        alert('الرجاء كتابة رسالة أولاً');
+        return;
+    }
 
+    console.log('📤 Current User:', currentUser);
+    console.log('📤 Message Text:', messageText);
+
+    // تحديد المستقبل
     const recipientId = currentUser.is_admin ? 
-        (currentChatUserId || null) : 15; // المدير ID = 15
+        (currentChatUserId || 15) : 15;
 
     const newMessage = {
         sender_id: currentUser.id,
@@ -292,22 +304,44 @@ async function sendMessage() {
         read: false
     };
 
-    const savedMessage = await saveMessageToDB(newMessage);
-    if (!savedMessage) {
-        alert('حدث خطأ في إرسال الرسالة');
-        return;
-    }
+    console.log('📤 Sending Message:', newMessage);
 
-    document.getElementById('newMessage').value = '';
-    
-    if (currentUser.is_admin && currentChatUserId) {
-        showChatWithUser(currentChatUserId);
-    } else {
-        showMessages();
+    try {
+        const { data, error } = await supabase
+            .from('messages')
+            .insert([newMessage])
+            .select();
+
+        if (error) {
+            console.error('❌ Error saving message:', error);
+            alert('حدث خطأ في إرسال الرسالة: ' + error.message);
+            return;
+        }
+
+        console.log('✅ Message sent successfully:', data);
+
+        // تحديث القائمة المحلية
+        if (data && data[0]) {
+            messages.push(data[0]);
+        }
+
+        // مسح حقل الرسالة
+        document.getElementById('newMessage').value = '';
+        
+        // تحديث الواجهة
+        if (currentUser.is_admin && currentChatUserId) {
+            showChatWithUser(currentChatUserId);
+        } else {
+            showMessages();
+        }
+        
+        updateUnreadCount();
+    } catch (err) {
+        console.error('❌ Exception in sendMessage:', err);
+        alert('حدث خطأ غير متوقع: ' + err.message);
     }
-    
-    updateUnreadCount();
 }
+
 
 function getUnreadCount() {
     if (!currentUser) return 0;
