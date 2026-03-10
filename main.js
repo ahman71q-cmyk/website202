@@ -1,24 +1,16 @@
 // ==================== إعدادات Supabase ====================
-// ==================== إعدادات Supabase ====================
 const supabaseUrl = 'https://lpigzuymmzisrawmfcuq.supabase.co';
 const supabaseKey = 'sb_publishable_vQ6Eh--B3jrQXgP_q3iN6Q_uv1m3k0G';
-
-// استخدم window.supabase عشان متعملش conflict
+// إنشاء العميل
 const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
-// استخدم supabaseClient بدل supabase في كل الكود
-// ==================== إعدادات Supabase ====================
-
-// ⚠️ سطر مهم جداً - عشان الـ Console
+// جعله متاحاً عالمياً
 window.supabase = supabaseClient;
 
 // ==================== البيانات ====================
-// ملاحظة: البيانات هتتحمّل من Supabase بدلاً من localStorage
 let users = [];
 let tasks = [];
 let messages = [];
-
-// متغيرات عامة
-let nextTaskId = 100; // هيتحدد بعد التحميل من الداتا بيز
+let nextTaskId = 100;
 let nextUserId = 100;
 let nextMessageId = 100;
 let currentSection = 'dashboard';
@@ -26,57 +18,49 @@ let messagesVisible = false;
 let messagesContentVisible = false;
 let selectedTaskForDescription = null;
 let currentChatUserId = null;
-
-let currentUser = null; // هيتحمّل من الجلسة
+let currentUser = null;
 
 // ==================== تحميل البيانات من Supabase ====================
 async function loadDataFromSupabase() {
     try {
         // تحميل المستخدمين
-        const {  usersData, error: usersError } = await supabaseClient
+        const { data: usersData, error: usersError } = await supabaseClient
             .from('user')
             .select('*')
             .order('id');
         if (usersError) throw usersError;
         users = usersData || [];
-        
-        // تحديث nextUserId
         if (users.length > 0) {
             nextUserId = Math.max(...users.map(u => u.id)) + 1;
         }
 
         // تحميل المهام
-        const {  tasksData, error: tasksError } = await supabaseClient
+        const { data: tasksData, error: tasksError } = await supabaseClient
             .from('tasks')
             .select('*')
             .order('id');
         if (tasksError) throw tasksError;
         tasks = tasksData || [];
-        
-        // تحديث nextTaskId
         if (tasks.length > 0) {
             nextTaskId = Math.max(...tasks.map(t => t.id)) + 1;
         }
 
         // تحميل الرسائل
-        const {  messagesData, error: messagesError } = await supabaseClient
+        const { data: messagesData, error: messagesError } = await supabaseClient
             .from('messages')
             .select('*')
             .order('time');
         if (messagesError) throw messagesError;
         messages = messagesData || [];
-        
-        // تحديث nextMessageId
         if (messages.length > 0) {
             nextMessageId = Math.max(...messages.map(m => m.id)) + 1;
         }
 
-        // تحميل المستخدم الحالي من الجلسة
+        // تحميل المستخدم الحالي
         const savedUser = localStorage.getItem('currentUser');
         if (savedUser) {
             currentUser = JSON.parse(savedUser);
-            // التحقق من وجود المستخدم في الداتا بيز
-            const {  verifiedUser } = await supabaseClient
+            const { data: verifiedUser } = await supabaseClient
                 .from('user')
                 .select('*')
                 .eq('id', currentUser.id)
@@ -86,7 +70,6 @@ async function loadDataFromSupabase() {
                 localStorage.removeItem('currentUser');
             }
         }
-
         console.log('✅ تم تحميل البيانات من Supabase');
     } catch (error) {
         console.error('❌ خطأ في تحميل البيانات:', error);
@@ -95,10 +78,8 @@ async function loadDataFromSupabase() {
 }
 
 // ==================== دوال حفظ البيانات في Supabase ====================
-
-// تحديث مهمة
 async function updateTaskInDB(taskId, updates) {
-    const { error } = await supabase
+    const { error } = await supabaseClient
         .from('tasks')
         .update(updates)
         .eq('id', taskId);
@@ -106,15 +87,13 @@ async function updateTaskInDB(taskId, updates) {
         console.error('Error updating task:', error);
         return false;
     }
-    // تحديث الـ local array
     const task = tasks.find(t => t.id === taskId);
     if (task) Object.assign(task, updates);
     return true;
 }
 
-// إضافة رسالة
 async function saveMessageToDB(messageData) {
-    const { data, error } = await supabase
+    const { data, error } = await supabaseClient
         .from('messages')
         .insert([messageData])
         .select();
@@ -126,22 +105,19 @@ async function saveMessageToDB(messageData) {
     return data[0];
 }
 
-// تحديث حالة الرسالة (مقروءة)
 async function markMessagesReadInDB(messageIds) {
-    const { error } = await supabase
+    const { error } = await supabaseClient
         .from('messages')
         .update({ read: true })
         .in('id', messageIds);
     if (error) console.error('Error marking messages read:', error);
-    // تحديث الـ local array
     messages.forEach(m => {
         if (messageIds.includes(m.id)) m.read = true;
     });
 }
 
-// إضافة مستخدم
 async function addUserToDB(userData) {
-    const { data, error } = await supabase
+    const { data, error } = await supabaseClient
         .from('user')
         .insert([{
             name: userData.name,
@@ -157,9 +133,8 @@ async function addUserToDB(userData) {
     return data[0];
 }
 
-// حذف مستخدم
 async function deleteUserFromDB(userId) {
-    const { error } = await supabase
+    const { error } = await supabaseClient
         .from('user')
         .delete()
         .eq('id', userId);
@@ -171,9 +146,8 @@ async function deleteUserFromDB(userId) {
     return true;
 }
 
-// تحديث مستخدم
 async function updateUserInDB(userId, newData) {
-    const { error } = await supabase
+    const { error } = await supabaseClient
         .from('user')
         .update(newData)
         .eq('id', userId);
@@ -186,9 +160,8 @@ async function updateUserInDB(userId, newData) {
     return true;
 }
 
-// إضافة مهمة
 async function addTaskToDB(taskData) {
-    const { data, error } = await supabase
+    const { data, error } = await supabaseClient
         .from('tasks')
         .insert([{
             title: taskData.title,
@@ -205,9 +178,8 @@ async function addTaskToDB(taskData) {
     return data[0];
 }
 
-// حذف مهمة
 async function deleteTaskFromDB(taskId) {
-    const { error } = await supabase
+    const { error } = await supabaseClient
         .from('tasks')
         .delete()
         .eq('id', taskId);
@@ -219,16 +191,14 @@ async function deleteTaskFromDB(taskId) {
     return true;
 }
 
-// تعيين مهمة لمستخدم (في جدول user_tasks)
 async function assignTaskToUserInDB(userId, taskId) {
-    const { error } = await supabase
+    const { error } = await supabaseClient
         .from('user_tasks')
         .insert([{ user_id: userId, task_id: taskId }]);
     if (error) {
         console.error('Error assigning task:', error);
         return false;
     }
-    // تحديث الـ local array
     const user = users.find(u => u.id === userId);
     if (user) {
         if (!user.tasks) user.tasks = [];
@@ -237,27 +207,25 @@ async function assignTaskToUserInDB(userId, taskId) {
     return true;
 }
 
-// ==================== دوال تسجيل الدخول (محدثة) ====================
-
-// دالة تسجيل الدخول
+// ==================== دوال تسجيل الدخول ====================
 async function login(username, password) {
     try {
-        const { data, error } = await supabase
+        const { data, error } = await supabaseClient
             .from('user')
             .select('*')
             .eq('name', username)
             .eq('password', password)
             .single();
-        
+
         if (error || !data) {
             return false;
         }
-        
+
         currentUser = data;
         localStorage.setItem('currentUser', JSON.stringify(currentUser));
         document.getElementById('messagesPanel').style.display = 'block';
         updateUnreadCount();
-        
+
         if (currentUser.is_admin) {
             showAdminDashboard();
         } else {
@@ -270,7 +238,6 @@ async function login(username, password) {
     }
 }
 
-// دالة تسجيل الخروج
 function logout() {
     localStorage.removeItem('currentUser');
     currentUser = null;
@@ -278,21 +245,15 @@ function logout() {
     showLoginPage();
 }
 
-// ==================== دوال الرسائل (محدثة) ====================
-
+// ==================== دوال الرسائل ====================
 async function sendMessage() {
     const messageText = document.getElementById('newMessage').value.trim();
     if (!messageText || !currentUser) {
-        console.error('❌ No message text or no current user');
         alert('الرجاء كتابة رسالة أولاً');
         return;
     }
 
-    console.log('📤 Current User:', currentUser);
-    console.log('📤 Message Text:', messageText);
-
-    // تحديد المستقبل
-    const recipientId = currentUser.is_admin ? 
+    const recipientId = currentUser.is_admin ?
         (currentChatUserId || 15) : 15;
 
     const newMessage = {
@@ -304,48 +265,37 @@ async function sendMessage() {
         read: false
     };
 
-    console.log('📤 Sending Message:', newMessage);
-
     try {
-        const { data, error } = await supabase
+        const { data, error } = await supabaseClient
             .from('messages')
             .insert([newMessage])
             .select();
 
         if (error) {
-            console.error('❌ Error saving message:', error);
             alert('حدث خطأ في إرسال الرسالة: ' + error.message);
             return;
         }
 
-        console.log('✅ Message sent successfully:', data);
-
-        // تحديث القائمة المحلية
         if (data && data[0]) {
             messages.push(data[0]);
         }
 
-        // مسح حقل الرسالة
         document.getElementById('newMessage').value = '';
-        
-        // تحديث الواجهة
+
         if (currentUser.is_admin && currentChatUserId) {
             showChatWithUser(currentChatUserId);
         } else {
             showMessages();
         }
-        
+
         updateUnreadCount();
     } catch (err) {
-        console.error('❌ Exception in sendMessage:', err);
         alert('حدث خطأ غير متوقع: ' + err.message);
     }
 }
 
-
 function getUnreadCount() {
     if (!currentUser) return 0;
-    
     if (currentUser.is_admin) {
         return messages.filter(m => m.recipient_id === 15 && !m.read).length;
     } else {
@@ -363,15 +313,13 @@ function updateUnreadCount() {
 }
 
 async function markMessagesAsRead(userId) {
-    const unreadMessages = messages.filter(m => 
+    const unreadMessages = messages.filter(m =>
         (m.recipient_id === userId || (m.sender_id === userId && m.recipient_id === currentUser?.id)) && !m.read
     );
-    
     if (unreadMessages.length > 0) {
         const messageIds = unreadMessages.map(m => m.id);
         await markMessagesReadInDB(messageIds);
     }
-    
     updateUnreadCount();
 }
 
@@ -379,10 +327,9 @@ function toggleMessages() {
     messagesContentVisible = !messagesContentVisible;
     const content = document.getElementById('messagesContent');
     const input = document.getElementById('messageInput');
-    
     if (content) content.style.display = messagesContentVisible ? 'block' : 'none';
     if (input) input.style.display = messagesContentVisible ? 'flex' : 'none';
-    
+
     if (messagesContentVisible) {
         if (currentUser?.is_admin) {
             showUserList();
@@ -395,9 +342,8 @@ function toggleMessages() {
 function showUserList() {
     const content = document.getElementById('messagesContent');
     if (!content) return;
-    
     let html = '<div style="padding: 10px;">';
-    
+
     users.filter(u => !u.is_admin).forEach(u => {
         const unreadFromUser = messages.filter(m => m.sender_id === u.id && !m.read).length;
         html += `
@@ -416,7 +362,7 @@ function showUserList() {
             </div>
         `;
     });
-    
+
     html += '</div>';
     content.innerHTML = html;
 }
@@ -425,11 +371,10 @@ async function showChatWithUser(userId) {
     currentChatUserId = userId;
     const user = users.find(u => u.id === userId);
     const content = document.getElementById('messagesContent');
-    
     if (!content || !user) return;
-    
+
     await markMessagesAsRead(userId);
-    
+
     let html = `<div style="padding: 10px;">
         <div onclick="showUserList()" style="
             padding: 5px;
@@ -438,14 +383,13 @@ async function showChatWithUser(userId) {
             border-radius: 5px;
             cursor: pointer;
             text-align: center;
-        ">🔙 رجوع</div>
-    `;
-    
-    const chatMessages = messages.filter(m => 
+        ">🔙 رجوع</div>`;
+
+    const chatMessages = messages.filter(m =>
         (m.sender_id === currentUser.id && m.recipient_id === userId) ||
         (m.sender_id === userId && m.recipient_id === currentUser.id)
     ).sort((a, b) => new Date(a.time) - new Date(b.time));
-    
+
     chatMessages.forEach(m => {
         const messageClass = m.sender_id === currentUser.id ? 'sent' : 'received';
         html += `
@@ -456,10 +400,10 @@ async function showChatWithUser(userId) {
             </div>
         `;
     });
-    
+
     html += '</div>';
     content.innerHTML = html;
-    
+
     setTimeout(() => {
         content.scrollTop = content.scrollHeight;
     }, 100);
@@ -467,18 +411,17 @@ async function showChatWithUser(userId) {
 
 async function showMessages() {
     if (!currentUser) return;
-    
     const content = document.getElementById('messagesContent');
     if (!content) return;
-    
+
     let html = '';
-    
-    const userMessages = messages.filter(m => 
+
+    const userMessages = messages.filter(m =>
         m.sender_id === currentUser.id || m.recipient_id === currentUser.id
     ).sort((a, b) => new Date(a.time) - new Date(b.time));
-    
+
     await markMessagesAsRead(currentUser.id);
-    
+
     userMessages.forEach(m => {
         const messageClass = m.sender_id === currentUser.id ? 'sent' : 'received';
         html += `
@@ -489,24 +432,22 @@ async function showMessages() {
             </div>
         `;
     });
-    
+
     if (html === '') {
         html = '<div style="text-align: center; color: #888; padding: 20px;">لا توجد رسائل بعد</div>';
     }
-    
+
     content.innerHTML = html;
-    
+
     setTimeout(() => {
         content.scrollTop = content.scrollHeight;
     }, 100);
 }
 
-// ==================== دوال المستخدمين (محدثة) ====================
-
+// ==================== دوال المستخدمين ====================
 async function addUser(userData) {
     return await addUserToDB(userData);
 }
-
 async function deleteUser(userId) {
     if (userId === 15) {
         alert('لا يمكن حذف المدير');
@@ -514,30 +455,23 @@ async function deleteUser(userId) {
     }
     return await deleteUserFromDB(userId);
 }
-
 async function updateUser(userId, newData) {
     return await updateUserInDB(userId, newData);
 }
 
-// ==================== دوال المهام (محدثة) ====================
-
+// ==================== دوال المهام ====================
 async function addTask(taskData) {
     return await addTaskToDB(taskData);
 }
-
 async function deleteTask(taskId) {
     return await deleteTaskFromDB(taskId);
 }
-
 async function updateTask(taskId, newData) {
     return await updateTaskInDB(taskId, newData);
 }
-
 async function assignTaskToUser(taskId, userId) {
     return await assignTaskToUserInDB(userId, taskId);
 }
-
-// ==================== تحديث حالة المهمة (محدثة) ====================
 
 async function updateTaskStatus(taskId, newStatus) {
     const success = await updateTaskInDB(taskId, { status: newStatus });
@@ -549,8 +483,7 @@ async function updateTaskStatus(taskId, newStatus) {
     return false;
 }
 
-// ==================== دوال عرض شرح المهمة (نفس الكود القديم) ====================
-
+// ==================== دوال عرض شرح المهمة ====================
 function showTaskDescription(taskId) {
     selectedTaskForDescription = taskId;
     if (currentUser?.is_admin) {
@@ -561,7 +494,6 @@ function showTaskDescription(taskId) {
         showUserPage();
     }
 }
-
 function closeTaskDescription() {
     selectedTaskForDescription = null;
     if (currentUser?.is_admin) {
@@ -574,11 +506,9 @@ function closeTaskDescription() {
 }
 
 // ==================== عرض صفحات الموقع ====================
-
 function showLoginPage() {
     const app = document.getElementById('app');
     if (!app) return;
-    
     app.innerHTML = `
         <div class="login-container">
             <h2>🔐 تسجيل الدخول</h2>
@@ -593,17 +523,15 @@ function showLoginPage() {
 async function showUserPage() {
     const app = document.getElementById('app');
     if (!app || !currentUser) return;
-    
-    // تحميل مهام المستخدم من جدول user_tasks
-    const {  userTasksData } = await supabase
+
+    const { data: userTasksData } = await supabaseClient
         .from('user_tasks')
         .select('task_id')
         .eq('user_id', currentUser.id);
-    
+
     const userTaskIds = userTasksData ? userTasksData.map(ut => ut.task_id) : [];
     const userTasks = tasks.filter(t => userTaskIds.includes(t.id));
-    
-    // عرض شرح المهمة المحددة
+
     let descriptionHtml = '';
     if (selectedTaskForDescription) {
         const task = tasks.find(t => t.id === selectedTaskForDescription);
@@ -619,7 +547,7 @@ async function showUserPage() {
             selectedTaskForDescription = null;
         }
     }
-    
+
     let tasksHtml = '';
     userTasks.forEach(t => {
         const statusClass = t.status === 'تمت' ? 'status-done' : 'status-pending';
@@ -673,24 +601,22 @@ async function showUserPage() {
 async function showAdminDashboard() {
     const app = document.getElementById('app');
     if (!app) return;
-    
     currentSection = 'dashboard';
     const totalTasks = tasks.length;
     const completedTasks = tasks.filter(t => t.status === 'تمت').length;
     const pendingTasks = tasks.filter(t => t.status !== 'تمت').length;
     const totalUsers = users.filter(u => !u.is_admin).length;
 
-    // تحميل تعيينات المهام من جدول user_tasks
-    const {  userTasksData } = await supabase
+    const { data: userTasksData } = await supabaseClient
         .from('user_tasks')
         .select('*');
-    
+
     let tasksHtml = '';
     tasks.forEach(t => {
         const assignedUserIds = userTasksData ? userTasksData.filter(ut => ut.task_id === t.id).map(ut => ut.user_id) : [];
         const assignedUsers = users.filter(u => assignedUserIds.includes(u.id)).map(u => u.name).join('، ') || 'غير معين';
         const statusClass = t.status === 'تمت' ? 'status-done' : 'status-pending';
-        
+
         tasksHtml += `<tr>
             <td>${t.id}</td>
             <td>${t.title}</td>
@@ -718,6 +644,8 @@ async function showAdminDashboard() {
                 <button class="nav-btn active" onclick="showAdminDashboard()">📊 الرئيسية</button>
                 <button class="nav-btn" onclick="showUserManagement()">👥 إدارة المستخدمين</button>
                 <button class="nav-btn" onclick="showTaskManagement()">📋 إدارة المهام</button>
+                <!-- ✅ تمت إضافة زر SQL Editor -->
+                <button class="nav-btn" onclick="showSQLEditor()">🛠️ SQL Editor</button>
             </div>
 
             <div class="stats">
@@ -761,9 +689,8 @@ async function showAdminDashboard() {
 async function showUserManagement() {
     const app = document.getElementById('app');
     if (!app) return;
-    
     currentSection = 'users';
-    
+
     let usersHtml = '';
     users.filter(u => !u.is_admin).forEach(u => {
         usersHtml += `<tr>
@@ -790,6 +717,7 @@ async function showUserManagement() {
                 <button class="nav-btn" onclick="showAdminDashboard()">📊 الرئيسية</button>
                 <button class="nav-btn active" onclick="showUserManagement()">👥 إدارة المستخدمين</button>
                 <button class="nav-btn" onclick="showTaskManagement()">📋 إدارة المهام</button>
+                <button class="nav-btn" onclick="showSQLEditor()">🛠️ SQL Editor</button>
             </div>
 
             <div class="add-form">
@@ -822,19 +750,17 @@ async function showUserManagement() {
 async function showTaskManagement() {
     const app = document.getElementById('app');
     if (!app) return;
-    
     currentSection = 'tasks';
-    
-    // تحميل تعيينات المهام
-    const {  userTasksData } = await supabase
+
+    const { data: userTasksData } = await supabaseClient
         .from('user_tasks')
         .select('*');
-    
+
     let tasksHtml = '';
     tasks.forEach(t => {
         const assignedUserIds = userTasksData ? userTasksData.filter(ut => ut.task_id === t.id).map(ut => ut.user_id) : [];
         const assignedUsers = users.filter(u => assignedUserIds.includes(u.id)).map(u => u.name).join('، ') || 'غير معين';
-        
+
         tasksHtml += `<tr>
             <td>${t.id}</td>
             <td>${t.title}</td>
@@ -850,7 +776,6 @@ async function showTaskManagement() {
         </tr>`;
     });
 
-    // عرض شرح المهمة المحددة
     let descriptionHtml = '';
     if (selectedTaskForDescription) {
         const task = tasks.find(t => t.id === selectedTaskForDescription);
@@ -877,6 +802,7 @@ async function showTaskManagement() {
                 <button class="nav-btn" onclick="showAdminDashboard()">📊 الرئيسية</button>
                 <button class="nav-btn" onclick="showUserManagement()">👥 إدارة المستخدمين</button>
                 <button class="nav-btn active" onclick="showTaskManagement()">📋 إدارة المهام</button>
+                <button class="nav-btn" onclick="showSQLEditor()">🛠️ SQL Editor</button>
             </div>
 
             <div class="add-form">
@@ -910,12 +836,107 @@ async function showTaskManagement() {
     `;
 }
 
-// ==================== دوال المعالجة (محدثة) ====================
+// ==================== ✅ دوال SQL Editor (جديد) ====================
+async function showSQLEditor() {
+    const app = document.getElementById('app');
+    currentSection = 'sql';
+    app.innerHTML = `
+        <div class="container">
+            <div class="header">
+                <h2>🛠️ محرر قواعد البيانات (SQL Editor)</h2>
+                <button class="logout-btn" onclick="logout()">خروج 🚪</button>
+            </div>
+            <div class="nav-menu">
+                <button class="nav-btn" onclick="showAdminDashboard()">📊 الرئيسية</button>
+                <button class="nav-btn" onclick="showUserManagement()">👥 إدارة المستخدمين</button>
+                <button class="nav-btn" onclick="showTaskManagement()">📋 إدارة المهام</button>
+                <button class="nav-btn active" onclick="showSQLEditor()">🛠️ SQL Editor</button>
+            </div>
+            
+            <div class="task-description-box" style="border-color: #00a8ff;">
+                <h3>⚠️ تحذير أمان</h3>
+                <p>استخدم هذه الأداة بحذر. يمكنك تنفيذ أوامر SELECT فقط للعرض.</p>
+            </div>
 
+            <div class="add-form">
+                <textarea id="sql-query" placeholder="اكتب أمر SQL هنا... مثال: SELECT * FROM tasks;" rows="5"></textarea>
+                <button onclick="executeSQL()" style="margin-top:10px;">تنفيذ الأمر ⚡</button>
+            </div>
+
+            <div id="sql-result" class="task-description-box" style="display:none;"></div>
+        </div>
+    `;
+}
+
+async function executeSQL() {
+    const query = document.getElementById('sql-query').value.trim();
+    const resultDiv = document.getElementById('sql-result');
+
+    if (!query) {
+        alert('الرجاء كتابة استعلام SQL');
+        return;
+    }
+
+    // منع الأوامر الخطيرة
+    const forbidden = ['DROP', 'DELETE', 'TRUNCATE', 'UPDATE', 'INSERT'];
+    if (forbidden.some(word => query.toUpperCase().includes(word))) {
+        alert('⛔ هذا الأمر غير مسموح به لأسباب أمنية! (SELECT فقط)');
+        return;
+    }
+
+    resultDiv.style.display = 'block';
+    resultDiv.innerHTML = 'جاري التنفيذ... ⏳';
+
+    try {
+        // دعم الجداول الأساسية فقط
+        if (query.toUpperCase().includes('SELECT * FROM TASKS')) {
+            const { data, error } = await supabaseClient.from('tasks').select('*');
+            renderSQLResult(data, error, resultDiv);
+        } else if (query.toUpperCase().includes('SELECT * FROM USER')) {
+            const { data, error } = await supabaseClient.from('user').select('*');
+            renderSQLResult(data, error, resultDiv);
+        } else if (query.toUpperCase().includes('SELECT * FROM MESSAGES')) {
+            const { data, error } = await supabaseClient.from('messages').select('*');
+            renderSQLResult(data, error, resultDiv);
+        } else if (query.toUpperCase().includes('SELECT * FROM USER_TASKS')) {
+            const { data, error } = await supabaseClient.from('user_tasks').select('*');
+            renderSQLResult(data, error, resultDiv);
+        } else {
+            resultDiv.innerHTML = '⚠️ لدعم أوامر معقدة، يرجى استخدام الأوامر الأساسية.<br>الأوامر المدعومة: SELECT * FROM TASKS, USER, MESSAGES, USER_TASKS';
+        }
+    } catch (err) {
+        resultDiv.innerHTML = `❌ خطأ: ${err.message}`;
+    }
+}
+
+function renderSQLResult(data, error, container) {
+    if (error) {
+        container.innerHTML = `❌ خطأ: ${error.message}`;
+        return;
+    }
+
+    if (!data || data.length === 0) {
+        container.innerHTML = '✅ تم التنفيذ، لكن لا توجد نتائج.';
+        return;
+    }
+
+    let html = '<table><thead><tr>';
+    Object.keys(data[0]).forEach(key => html += `<th>${key}</th>`);
+    html += '</tr></thead><tbody>';
+
+    data.forEach(row => {
+        html += '<tr>';
+        Object.values(row).forEach(val => html += `<td>${val}</td>`);
+        html += '</tr>';
+    });
+    html += '</tbody></table>';
+    container.innerHTML = html;
+}
+
+// ==================== دوال المعالجة ====================
 window.handleLogin = async function() {
     const username = document.getElementById('username').value.trim();
     const password = document.getElementById('password').value.trim();
-    
     if (await login(username, password)) {
         // تم تسجيل الدخول بنجاح
     } else {
@@ -925,23 +946,19 @@ window.handleLogin = async function() {
         }
     }
 };
-
 window.changeStatus = async function(taskId, newStatus) {
     if (await updateTaskStatus(taskId, newStatus)) {
         showAdminDashboard();
     }
 };
-
 window.changeUserTaskStatus = async function(taskId, newStatus) {
     if (await updateTaskStatus(taskId, newStatus)) {
         showUserPage();
     }
 };
-
 window.addUserHandler = async function() {
     const name = document.getElementById('newUserName').value.trim();
     const password = document.getElementById('newUserPassword').value.trim();
-    
     if (name && password) {
         await addUser({ name, password });
         showUserManagement();
@@ -949,7 +966,6 @@ window.addUserHandler = async function() {
         alert('الرجاء إدخال جميع البيانات');
     }
 };
-
 window.deleteUserHandler = async function(userId) {
     if (confirm('هل أنت متأكد من حذف هذا المستخدم؟')) {
         if (await deleteUser(userId)) {
@@ -957,25 +973,21 @@ window.deleteUserHandler = async function(userId) {
         }
     }
 };
-
 window.editUser = async function(userId) {
     const user = users.find(u => u.id === userId);
     if (!user) return;
-    
     const newName = prompt('أدخل الاسم الجديد:', user.name);
     const newPassword = prompt('أدخل الرقم السري الجديد:', user.password);
-    
+
     if (newName && newPassword) {
         await updateUser(userId, { name: newName, password: newPassword });
         showUserManagement();
     }
 };
-
 window.addTaskHandler = async function() {
     const title = document.getElementById('newTaskTitle').value.trim();
     const refs = document.getElementById('newTaskRefs').value.trim();
     const description = document.getElementById('newTaskDescription').value.trim();
-    
     if (title && refs) {
         await addTask({ title, refs, description });
         showTaskManagement();
@@ -983,7 +995,6 @@ window.addTaskHandler = async function() {
         alert('الرجاء إدخال جميع البيانات');
     }
 };
-
 window.deleteTaskHandler = async function(taskId) {
     if (confirm('هل أنت متأكد من حذف هذه المهمة؟')) {
         if (await deleteTask(taskId)) {
@@ -994,50 +1005,43 @@ window.deleteTaskHandler = async function(taskId) {
         }
     }
 };
-
 window.editTask = async function(taskId) {
     const task = tasks.find(t => t.id === taskId);
     if (!task) return;
-    
     const newTitle = prompt('أدخل العنوان الجديد:', task.title);
     const newRefs = prompt('أدخل الأرقام المرجعية الجديدة:', task.refs);
-    
+
     if (newTitle && newRefs) {
         await updateTask(taskId, { title: newTitle, refs: newRefs });
         showTaskManagement();
     }
 };
-
 window.editTaskDescription = async function(taskId) {
     const task = tasks.find(t => t.id === taskId);
     if (!task) return;
-    
     const newDescription = prompt('أدخل الشرح الجديد للمهمة:', task.description || '');
-    
+
     if (newDescription !== null) {
         await updateTask(taskId, { description: newDescription });
         selectedTaskForDescription = taskId;
         showTaskManagement();
     }
 };
-
 window.assignTask = async function(taskId) {
     const availableUsers = users.filter(u => !u.is_admin);
     let userList = 'اختر المستخدم:\n';
     availableUsers.forEach((u, index) => {
         userList += `${index + 1}. ${u.name}\n`;
     });
-    
     const choice = prompt(userList + 'أدخل رقم المستخدم:');
     const userIndex = parseInt(choice) - 1;
-    
+
     if (userIndex >= 0 && userIndex < availableUsers.length) {
         const userId = availableUsers[userIndex].id;
         await assignTaskToUser(taskId, userId);
         showTaskManagement();
     }
 };
-
 window.showTaskDescription = function(taskId) {
     selectedTaskForDescription = taskId;
     if (currentUser?.is_admin) {
@@ -1046,7 +1050,6 @@ window.showTaskDescription = function(taskId) {
         showUserPage();
     }
 };
-
 window.closeTaskDescription = function() {
     selectedTaskForDescription = null;
     if (currentUser?.is_admin) {
@@ -1055,17 +1058,16 @@ window.closeTaskDescription = function() {
         showUserPage();
     }
 };
-
 window.logout = logout;
 window.toggleMessages = toggleMessages;
 window.sendMessage = sendMessage;
+// ✅ إضافة دوال SQL Editor للـ window
+window.showSQLEditor = showSQLEditor;
+window.executeSQL = executeSQL;
 
 // ==================== تشغيل الموقع ====================
 document.addEventListener('DOMContentLoaded', async () => {
-    // تحميل البيانات من Supabase أولاً
     await loadDataFromSupabase();
-    
-    // ثم عرض الصفحة المناسبة
     if (currentUser) {
         const messagesPanel = document.getElementById('messagesPanel');
         if (messagesPanel) {
@@ -1082,30 +1084,4 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 });
 
-// تحديث عدد الرسائل كل 5 ثواني
 setInterval(updateUnreadCount, 5000);
-
-
-
-
-
-
-
-
-
-// تأكد من المتغيرات الأساسية
-// console.log('✅ Supabase URL:', typeof supabaseUrl !== 'undefined' ? supabaseUrl : 'NOT DEFINED');
-// console.log('✅ Supabase Key:', typeof supabaseKey !== 'undefined' ? supabaseKey : 'NOT DEFINED');
-// console.log('✅ Supabase Client:', typeof supabase !== 'undefined' ? 'DEFINED' : 'NOT DEFINED');
-
-
-
-// تأكد إن Supabase متصل
-// console.log('URL:', supabaseUrl);
-// console.log('Key:', supabaseKey);
-// console.log('Client:', supabaseClient);
-
-// جرب تجيب المستخدمين
-// const {  data, error } = await supabaseClient.from('user').select('*');
-// console.log('✅ Users:', data);
-// console.log('❌ Error:', error);
